@@ -1,0 +1,17 @@
+{
+  "name": "kinan-account-manager",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node ."
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "config": "^3.3.9",
+    "knex": "^2.5.1",
+    "mysql2": "^3.5.2"
+  }
+}
