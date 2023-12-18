@@ -8,6 +8,7 @@ const { cwd } = require('process')
 const STATS_FILE = path.resolve(__dirname, '../.cache/stats.json')
 const ACCOUNTS_FILE = path.resolve(__dirname, '../.cache/accounts.csv')
 const KINAN_OUTPUT_FOLDER = path.resolve(cwd(), config.get('kinanOutputFolder'))
+const LAST_COUNT_FILE = path.resolve(__dirname, '../.cache/lastCount.txt')
 
 /**
  * Wrapped around `fetch` with an abort controller and error catcher
@@ -32,6 +33,10 @@ const fetchWrapper = async (
   } finally {
     clearTimeout(timeout)
   }
+}
+
+if (!fs.existsSync(LAST_COUNT_FILE)) {
+  fs.writeFileSync(LAST_COUNT_FILE, '0')
 }
 
 async function main() {
@@ -64,47 +69,61 @@ async function main() {
     timestamp: Date.now(),
   }
 
-  const allAccounts = fs.readdirSync(KINAN_OUTPUT_FOLDER).flatMap((file) => {
-    const lines = fs
-      .readFileSync(path.resolve(KINAN_OUTPUT_FOLDER, file), 'utf-8')
-      .split('\n')
-      .filter((l) => !l.startsWith('#') && l.endsWith('OK;'))
-    return lines.map((line) => {
-      const [user, pass, email] = line.split(';')
-      return `${user},${pass},${email}`
+  if (config.get('kinanOutputFolder')) {
+    const allAccounts = fs.readdirSync(KINAN_OUTPUT_FOLDER).flatMap((file) => {
+      const lines = fs
+        .readFileSync(path.resolve(KINAN_OUTPUT_FOLDER, file), 'utf-8')
+        .split('\n')
+        .filter((l) => !l.startsWith('#') && l.endsWith('OK;'))
+      return lines.map((line) => {
+        const [user, pass, email] = line.split(';')
+        return `${user},${pass},${email}`
+      })
     })
-  })
 
-  const existingAccounts = new Set(
-    (fs.existsSync(ACCOUNTS_FILE)
-      ? fs.readFileSync(ACCOUNTS_FILE, 'utf-8').split('\n')
-      : []
-    ).map((row) => {
-      const [username] = row.split(',')
-      return username.trim()
+    const existingAccounts = new Set(
+      (fs.existsSync(ACCOUNTS_FILE)
+        ? fs.readFileSync(ACCOUNTS_FILE, 'utf-8').split('\n')
+        : []
+      ).map((row) => {
+        const [username] = row.split(',')
+        return username.trim()
+      })
+    )
+
+    fs.writeFileSync(
+      path.resolve(ACCOUNTS_FILE),
+      allAccounts.join('\n'),
+      'utf8'
+    )
+
+    const newAccounts = allAccounts.filter((account) => {
+      const [username] = account.split(',')
+      return !existingAccounts.has(username)
     })
-  )
+    stats.newAccounts = newAccounts.length
 
-  fs.writeFileSync(path.resolve(ACCOUNTS_FILE), allAccounts.join('\n'), 'utf8')
+    const accountsForDb = newAccounts.map((account) => {
+      const [username, password] = account.split(',')
+      return { username, password, level: 0 }
+    })
 
-  const newAccounts = allAccounts.filter((account) => {
-    const [username] = account.split(',')
-    return !existingAccounts.has(username)
-  })
-  stats.newAccounts = newAccounts.length
-  console.log('Made', stats.newAccounts, 'new accounts')
-
-  const accountsForDb = newAccounts.map((account) => {
-    const [username, password] = account.split(',')
-    return { username, password, level: 0 }
-  })
-
-  if (accountsForDb.length) {
-    await leveler('account')
-      .insert(accountsForDb)
-      .onConflict('username')
-      .ignore()
+    if (accountsForDb.length) {
+      await leveler('account')
+        .insert(accountsForDb)
+        .onConflict('username')
+        .ignore()
+    }
+  } else {
+    const lastCount = parseInt(fs.readFileSync(LAST_COUNT_FILE, 'utf-8'))
+    const newAccounts = await leveler('account')
+      .count('username', { as: 'total' })
+      .first()
+    const diff = (+(newAccounts?.total || 0) || 0) - lastCount
+    stats.newAccounts = diff
+    fs.writeFileSync(LAST_COUNT_FILE, `${newAccounts?.total || lastCount}`)
   }
+  console.log('Made', stats.newAccounts, 'new accounts')
 
   const newThirties = await leveler('account')
     .where('banned', '=', 0)
@@ -146,14 +165,15 @@ async function main() {
 
   fs.writeFileSync(STATS_FILE, JSON.stringify(existingStats))
 
+  /** @type {Record<string, number>} */
   const goodThirties = Object.fromEntries(
     await Promise.all(
       destinationDbs.map(async ({ connection, name }) => {
         const goodThirties = await connection('account')
           .where('level', '>', 29)
-          .andWhere('banned', 0)
-          .andWhere('invalid', 0)
-          .whereNull('last_disabled')
+          // .andWhere('banned', 0)
+          // .andWhere('invalid', 0)
+          // .whereNull('last_disabled')
           .count('username', { as: 'total' })
           .first()
         return [name, goodThirties?.total ?? 0]
@@ -177,11 +197,11 @@ async function main() {
             fields: [
               {
                 name: 'Number of Level 0s Created',
-                value: `${stats.newAccounts}`,
+                value: `${stats.newAccounts.toLocaleString()}`,
               },
               {
                 name: 'Number of Level 30s Created',
-                value: `${stats.newThirties}`,
+                value: `${stats.newThirties.toLocaleString()}`,
               },
               ...destinationDbs.map(({ name }) => ({
                 name: `Number of Level 30s Added to ${name}`,
@@ -195,7 +215,7 @@ async function main() {
             color: 5814783,
             fields: Object.entries(goodThirties).map(([name, total]) => ({
               name: `Number of Level 30s in ${name}`,
-              value: `${total}`,
+              value: `${total.toLocaleString()}`,
             })),
             timestamp: new Date().toISOString(),
           },
@@ -204,7 +224,7 @@ async function main() {
       }),
     }).then((res) => console.log('Webhook status', res?.status))
   }
-  
+
   await Promise.all(
     destinationDbs.map(async (db) => await db.connection.destroy())
   )
