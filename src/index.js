@@ -231,7 +231,7 @@ async function main() {
   await leveler.destroy()
 
   const date = new Date()
-  if (date.getHours() === 4 && date.getMinutes() < 10) {
+  if (date.getHours() === 0 && date.getMinutes() < 15) {
     // only reload once at midnight
     await Promise.allSettled(
       reloadUrls.map((url) =>
