@@ -1,4 +1,4 @@
-# Kinan Account Manager
+# Cion/Kinan Account Manager
 
 ## Description
 
@@ -25,7 +25,7 @@ A Discord webhook address to send reports to.
 
 ### `kinanOutputFolder`
 
-The _relative_ path from the directory that you're executing this script. So if you're in the root of this project, and your output is in `../kinan/output`, you would put that here.
+The _relative_ path from the directory that you're executing this script. So if you're in the root of this project, and your output is in `../kinan/output`, you would put that here. If you leave this blank, it will instead determine the difference in level 0s made by comparing the total counts in the database since the last run.
 
 ### `levelerDb`
 
