@@ -23,6 +23,10 @@ Basic JS script to move accounts around depending on status and report stats to 
 
 A Discord webhook address to send reports to.
 
+### `levelToMove`
+
+The level that at an account should reach in your leveling process before it's distributed to your production processes.
+
 ### `kinanOutputFolder`
 
 The _relative_ path from the directory that you're executing this script. So if you're in the root of this project, and your output is in `../kinan/output`, you would put that here. If you leave this blank, it will instead determine the difference in level 0s made by comparing the total counts in the database since the last run.

@@ -1,6 +1,7 @@
 {
   "discordWebhookurl": "",
   "kinanOutputFolder": "",
+  "levelToMove": 30,
   "levelerDb": {
     "host": "",
     "port": 3306,

@@ -127,7 +127,7 @@ async function main() {
 
   const newThirties = await leveler('account')
     .where('banned', '=', 0)
-    .where('level', '>', 29)
+    .where('level', '>=', config.get('levelToMove'))
   stats.newThirties = newThirties.length
   console.log(newThirties.length, 'ready for use!')
 
@@ -200,21 +200,21 @@ async function main() {
                 value: `${stats.newAccounts.toLocaleString()}`,
               },
               {
-                name: 'Number of Level 30s Created',
+                name: `Number of Level ${config.get('levelToMove')}s Created`,
                 value: `${stats.newThirties.toLocaleString()}`,
               },
               ...destinationDbs.map(({ name }) => ({
-                name: `Number of Level 30s Added to ${name}`,
+                name: `Number of Level ${config.get('levelToMove')}s Added to ${name}`,
                 value: `${stats[`new${name}`] || 0}`,
               })),
             ],
             timestamp: new Date().toISOString(),
           },
           {
-            title: 'Fresh Accounts',
+            title: 'Level 30 or Higher',
             color: 5814783,
             fields: Object.entries(goodThirties).map(([name, total]) => ({
-              name: `Number of Level 30s in ${name}`,
+              name: name,
               value: `${total.toLocaleString()}`,
             })),
             timestamp: new Date().toISOString(),
